@@ -1,7 +1,7 @@
 import pulp as pl
 import math
 #the problem
-linear = pl.LpProblem("Linear approximation", pl.LpMaximize)
+linear = pl.LpProblem("Linear approximation", pl.LpMinimize)
 
 #the constants
 point1 = (0, 2)
@@ -23,10 +23,7 @@ number_of_points = 10
 #the variables
 
 distance_delta = pl.LpVariable("distance_delta", lowBound=0)
-coefs = []
-for i in range(polynomial_degree+1):
-    x = pl.LpVariable("x"+str(i))
-    coefs.append(x)
+coefs = [pl.LpVariable(f"x{i}") for i in range(polynomial_degree +1)]
 
 #target function
 linear += distance_delta
@@ -38,14 +35,20 @@ sums=[]
 for point in points:
     sum =0
     for j in range(polynomial_degree+1):
-        sum += coefs[j]*math.pow(point[0],j)
+        sum += coefs[j]*(point[0]**j)
     sums.append(sum)    
 
-#equations constraints
-for i in range(number_of_points):
-    linear += sums[i] + distance_delta <= points[i][1]
-    linear += sums[i] - distance_delta >= points[i][1]
-
+# #equations constraints
+# for i in range(number_of_points):
+#     linear += sums[i] + distance_delta <= points[i][1]
+#     linear += sums[i] - distance_delta >= points[i][1]
+# Constraints
+for x, y in points:
+    # Calculate polynomial value at x
+    polynomial_value = pl.lpSum([coefs[j] * (x**j) for j in range(polynomial_degree + 1)])
+    # Add constraints for each point
+    linear += polynomial_value - distance_delta <= y
+    linear += polynomial_value + distance_delta >= y
 #nonnegative constraints
 # for coef in coefs:
 #     linear += coef >= 0
@@ -65,8 +68,13 @@ print(f"SOLUTION")
 for i in range(polynomial_degree+1):
     print("x"+str(i)+f" = {pl.value(coefs[i])}")
 print(f"Maximum of minimal distances: {pl.value(linear.objective)}")
+
+#check the solution
 optimum = pl.value(linear.objective)
-cfs =[pl.value(coef) for coef in coefs]
+
+
+
+#plots the solution
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -81,12 +89,24 @@ for point in points:
     arrayY.append(point[1])
 y= np.array(arrayY)
 
-def f(x):
-    return sum(cfs[i]*x**i +optimum for i in range(len(cfs)))
+
 
 t = np.linspace(0,10,100)
 #polynomial_values = [f(val) for val in t]
 
-plt.plot(t,f(x))
+
+#plt.plot(t,f(x))
+if pl.LpStatus[solution] != "Optimal":
+    print("Solver did not find an optimal solution.")
+    #exit()
+else:
+    print("Solution is optimal")
+    cfs =[pl.value(coef) for coef in coefs]
+    print(cfs, type(cfs[0]))
+    
+    def f(x):
+        return sum(c * x**i for i,c in  enumerate(cfs)) +optimum
+    polynomial_values = f(t)
+    plt.plot(t, polynomial_values)
 plt.scatter(x,y)
 plt.show()
